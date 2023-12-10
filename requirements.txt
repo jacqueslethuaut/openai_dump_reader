@@ -1,0 +1,4 @@
+dash==2.14.2
+dash_dangerously_set_inner_html==0.0.2
+markdown2==2.4.11
+pandas==2.1.3
