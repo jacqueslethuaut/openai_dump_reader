@@ -9,22 +9,36 @@ import streamlit as st
 
 from datetime import datetime
 
-filename = "ChatGPT on 07 12 2023/conversations3.json"
+DEFAULT_FILENAME = "ChatGPT on 07 12 2023/conversations3.json"
 file_path = os.path.realpath(__file__)
 directory = os.path.dirname(file_path)
-filename = os.path.join(directory, filename)
+DEFAULT_FILENAME = os.path.join(directory, DEFAULT_FILENAME)
 
-def load_data():
-    with open(filename, 'r') as file:
-        json_data = json.load(file)
+
+def load_data(uploaded_file=None):
+    try:
+        # If a file is uploaded, use it directly
+        if uploaded_file is not None:
+            json_data = json.load(uploaded_file)
+        else:
+            # Load default file
+            with open(DEFAULT_FILENAME, 'r') as file:
+                json_data = json.load(file)
 
         for item in json_data:
             if isinstance(item, dict) and "mapping" in item:
                 process_mapping(item["mapping"])
             else:
                 print("Mapping not found in this item.")
+        return json_data
 
-    return json_data
+    except json.JSONDecodeError:
+        st.error("Invalid JSON file")
+        return []
+    except FileNotFoundError:
+        st.error(f"Default file '{DEFAULT_FILENAME}' not found")
+        return []
+    
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -129,8 +143,11 @@ def display_latex():
 
 def main():
     st.title('OpenAI dump Reader')
-
-    # Initialize session state variables
+    
+    if 'uploaded_file' not in st.session_state:
+        st.session_state['uploaded_file'] = None
+    if 'search_mode' not in st.session_state:
+        st.session_state['search_mode'] = "Title"
     if 'search_mode' not in st.session_state:
         st.session_state['search_mode'] = "Title"
     if 'search_button_pressed' not in st.session_state:
@@ -142,7 +159,13 @@ def main():
     if 'selected_search_title' not in st.session_state:
         st.session_state['selected_search_title'] = None
 
-    conversations = load_data()
+    new_uploaded_file = st.sidebar.file_uploader("Load Conversations from JSON File", type=['json'], key="file_uploader")
+
+    if new_uploaded_file is not None:
+        st.session_state['uploaded_file'] = new_uploaded_file
+
+    conversations = load_data(st.session_state['uploaded_file']) if st.session_state['uploaded_file'] else load_data()
+
     st.sidebar.header("Conversations and Search")
 
     with st.sidebar.expander("Search Conversations", expanded=st.session_state.search_button_pressed):
