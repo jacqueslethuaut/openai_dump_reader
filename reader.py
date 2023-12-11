@@ -50,8 +50,9 @@ def display_message(mapping, node_id, level=0):
     if message and 'content' in message and 'parts' in message['content']:
         parts = message['content']['parts']
         for part in parts:
-            if part.strip():
+            if isinstance(part, str) and part.strip():
                 # Modify part for LaTeX if it's from system or assistant
+                author_role = message.get("author", {}).get("role", "").lower()
                 if author_role in ["system", "assistant"]:
                     part = modify_latex_for_streamlit(part)
 
@@ -59,11 +60,16 @@ def display_message(mapping, node_id, level=0):
                 indent = "    " * level
                 formatted_part = indent + part.replace("\n", "\n" + indent)
 
-                # Display user messages as plain text in white color, others in Markdown
+                # Display user messages as plain text, others in Markdown
                 if author_role == "user":
                     st.markdown(f'<span style="color: yellow;">{formatted_part}</span>', unsafe_allow_html=True)
                 else:
                     st.markdown(formatted_part, unsafe_allow_html=True)
+            elif isinstance(part, dict) and 'content_type' in part:
+                # Process other content types like images
+                if part['content_type'] == 'image_asset_pointer':
+                    image_url = part.get('asset_pointer', '')
+                    st.image(image_url, caption='Image', width=300)  
 
     # Recursively display children messages
     for child_id in node.get('children', []):
