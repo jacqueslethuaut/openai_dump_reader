@@ -12,3 +12,5 @@ and run
 ```bash
 streamlit run reader.py
 ```
+
+You have a search functionality and you can activate all conversations

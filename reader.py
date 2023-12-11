@@ -1,3 +1,7 @@
+# MIT License
+#
+# Copyright (c) 2023 Jacques Le Thuaut
+
 import os
 import re
 import json
@@ -123,32 +127,73 @@ def display_latex():
     latex_string = r"$$ e^{i\pi} + 1 = 0 $$"
     st.markdown(latex_string, unsafe_allow_html=True)
 
-
 def main():
-    local_css("style.css")
-
     st.title('OpenAI dump Reader')
-    
+
+    # Initialize session state variables
+    if 'search_mode' not in st.session_state:
+        st.session_state['search_mode'] = "Title"
+    if 'search_button_pressed' not in st.session_state:
+        st.session_state['search_button_pressed'] = False
+    if 'browse_button_pressed' not in st.session_state:
+        st.session_state['browse_button_pressed'] = False
+    if 'selected_browse_title' not in st.session_state:
+        st.session_state['selected_browse_title'] = None
+    if 'selected_search_title' not in st.session_state:
+        st.session_state['selected_search_title'] = None
+
     conversations = load_data()
+    st.sidebar.header("Conversations and Search")
 
-    titles = [conv['title'] for conv in conversations if 'title' in conv]
+    with st.sidebar.expander("Search Conversations", expanded=st.session_state.search_button_pressed):
+        search_mode = st.radio("Search by", ["Title", "All Messages"], key='search_mode')
+        search_term = st.text_input("Search term", key='search_term')
+        if st.button("Search"):
+            st.session_state['search_button_pressed'] = True
+            st.session_state['browse_button_pressed'] = False
 
-    st.sidebar.header("Conversations")
-    selected_title = st.sidebar.radio("Select a conversation:", titles, index=0)
+    with st.sidebar.expander("Browse Conversations", expanded=st.session_state.browse_button_pressed):
+        titles = [conv['title'] for conv in conversations if 'title' in conv]
+        if st.button("Activate All Conversations"):
+            st.session_state['browse_button_pressed'] = True
+            st.session_state['search_button_pressed'] = False
+        st.session_state['selected_browse_title'] = st.radio("Select a conversation:", titles, index=0, key='browse_select')
 
-    if selected_title:
-        selected_conversation = next((conv for conv in conversations if conv['title'] == selected_title), None)
-        if selected_conversation:
-#            st.header("Conversation Details")
-            st.markdown("Title: **{}**".format(selected_conversation.get('title', 'No Title')))
-            st.markdown("Create Time: **{}**".format(convert_timestamp(selected_conversation.get('create_time'))))
-            st.markdown("Update Time: **{}**".format(convert_timestamp(selected_conversation.get('update_time'))))
+    # Display logic
+    if st.session_state.search_button_pressed and search_term:
+        filtered_conversations = filter_conversations(conversations, search_term, search_mode)
+        if filtered_conversations:
+            st.session_state['selected_search_title'] = st.sidebar.selectbox("Select from search results:", [conv['title'] for conv in filtered_conversations], key='search_select')
+            selected_conversation = next((conv for conv in filtered_conversations if conv['title'] == st.session_state['selected_search_title']), None)
+            display_conversation(selected_conversation)
+    elif st.session_state.browse_button_pressed and st.session_state['selected_browse_title']:
+        selected_conversation = next((conv for conv in conversations if conv['title'] == st.session_state['selected_browse_title']), None)
+        display_conversation(selected_conversation)
 
-            mapping = selected_conversation.get('mapping', {})
-            root_nodes = [node_id for node_id, node in mapping.items() if node.get('parent') is None]
+    
 
-            for root_node in root_nodes:
-                display_message(mapping, root_node)
+def display_conversation(conversation):
+    if conversation:
+        # Display conversation details
+        st.markdown("Title: **{}**".format(conversation.get('title', 'No Title')))
+        st.markdown("Create Time: **{}**".format(convert_timestamp(conversation.get('create_time'))))
+        st.markdown("Update Time: **{}**".format(convert_timestamp(conversation.get('update_time'))))
+
+        mapping = conversation.get('mapping', {})
+        root_nodes = [node_id for node_id, node in mapping.items() if node.get('parent') is None]
+
+        for root_node in root_nodes:
+            display_message(mapping, root_node)
+
+def filter_conversations(conversations, term, mode):
+    """
+    Filter conversations based on the search term and mode.
+    """
+    if mode == "Title":
+        return [conv for conv in conversations if term.lower() in conv.get('title', '').lower()]
+    else:
+        # Implement logic to search through all messages
+        return [conv for conv in conversations if term.lower() in str(conv).lower()]
 
 
 if __name__ == '__main__':
